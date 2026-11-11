@@ -59,7 +59,7 @@ body {
 
 /* Barra superior */
 nav { display: flex; align-items: center; justify-content: space-between; gap: 16px; padding: 18px 0; color: #fff; }
-.brand { display: inline-block; background: #fff; border-radius: 20px; padding: 18px 28px; box-shadow: 0 12px 30px rgba(0,0,0,.22); margin-bottom: 22px; }
+.brand { display: block; width: fit-content; margin: 0 auto 22px; background: #fff; border-radius: 20px; padding: 18px 28px; box-shadow: 0 12px 30px rgba(0,0,0,.22); }
 .brand img { display: block; width: min(460px, 80vw); height: auto; }
 nav .links { display: flex; gap: 20px; font-size: 14px; opacity: .85; }
 nav .links a { color: inherit; text-decoration: none; }
@@ -146,7 +146,7 @@ footer { color: var(--muted); font-size: 13px; text-align: center; padding: 40px
 <body>
 <div class="wrap">
   <nav>
-    <div class="links"><a href="#registro">Registro</a><a href="#caracteristicas">Cómo funciona</a><a href="#lista">Asistentes</a></div>
+    <div class="links"><a href="#registro">Registro</a><a href="#lista">Asistentes</a></div>
   </nav>
 
   <header class="hero">
@@ -177,17 +177,6 @@ footer { color: var(--muted); font-size: 13px; text-align: center; padding: 40px
     </form>
   </section>
 
-  <section class="section" id="caracteristicas">
-    <span class="badge">Cómo funciona</span>
-    <h2>Asistencia clara, firmada y guardada</h2>
-    <p>Todo queda registrado por evento, listo para consultar cuando lo necesites.</p>
-    <div class="grid">
-      <article class="card hl"><div class="ico">01</div><h3>Firma digital</h3><p>Cada persona firma en pantalla, sin papel.</p></article>
-      <article class="card"><div class="ico">02</div><h3>Por evento</h3><p>Cada evento tiene su propia lista de asistencia.</p></article>
-      <article class="card"><div class="ico">03</div><h3>Registro en vivo</h3><p>Los asistentes aparecen al instante en la lista.</p></article>
-      <article class="card"><div class="ico">04</div><h3>Exportable</h3><p>Los datos quedan en una hoja de cálculo para descargarlos.</p></article>
-    </div>
-  </section>
 
   <section id="lista" aria-labelledby="lista-title">
     <div class="lista-head">
