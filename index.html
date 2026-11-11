@@ -183,7 +183,7 @@ footer { text-align: center; color: var(--muted); font-size: 13px; padding: 28px
         <div class="field"><label for="c-facilitador">Facilitador</label><input id="c-facilitador"></div>
         <div class="field full"><label for="c-objetivo">Objetivo (opcional)</label><textarea id="c-objetivo"></textarea></div>
       </div>
-      <div class="actions"><button type="submit" class="primary">Generar enlace</button></div>
+      <div class="actions"><button type="submit" class="primary" id="btn-crear">Generar enlace</button></div>
       <p class="status" id="crear-status" role="status" aria-live="polite"></p>
     </form>
     <div class="link-box" id="link-box" hidden>
@@ -193,7 +193,7 @@ footer { text-align: center; color: var(--muted); font-size: 13px; padding: 28px
         <button type="button" class="primary" id="copiar">Copiar enlace</button>
         <button type="button" id="abrir">Abrir lista</button>
       </div>
-      <p class="hint" style="margin:0">Guarda este enlace: con él también abres la lista del evento para descargarla.</p>
+      <p class="hint" style="margin:0">Guarda este enlace: con él también abres la lista del evento para descargarla. Los eventos quedan guardados en tu hoja de Google Sheets.</p>
     </div>
   </section>
 
@@ -259,48 +259,59 @@ footer { text-align: center; color: var(--muted); font-size: 13px; padding: 28px
 <script>
 (() => {
   // ====== CONFIGURACIÓN ======
-  const ENDPOINT = "PEGA_AQUI_LA_URL_DE_APPS_SCRIPT";
+  const ENDPOINT = "https://script.google.com/macros/s/AKfycbyf4Xc0XTxFCW9pXPIVlP-axuu31D0A2Jy6TPebEWkPtPUr3lUwE0afnN4sW23JJpNZ/exec";
   const FILAS_MINIMAS = 20;
   // ===========================
 
   const $ = (id) => document.getElementById(id);
   const params = new URLSearchParams(location.search);
-  const EVENTO = {
-    nombre: (params.get("evento") || "").trim(),
-    fecha: (params.get("fecha") || "").trim(),
-    hora: (params.get("hora") || "").trim(),
-    duracion: (params.get("duracion") || "").trim(),
-    facilitador: (params.get("facilitador") || "").trim(),
-    objetivo: (params.get("objetivo") || "").trim()
-  };
-  const esDelEvento = EVENTO.nombre !== "";
+  const EVENTO_ID = (params.get("e") || "").trim();
+  const EVENTO = { id: EVENTO_ID, nombre: "", fecha: "", hora: "", duracion: "", facilitador: "", objetivo: "" };
 
   const fmtFecha = (v) => {
     const m = /^(\d{4})-(\d{2})-(\d{2})$/.exec(v);
     return m ? m[3] + "/" + m[2] + "/" + m[1] : v;
   };
-  // Clave con la que se guarda la asistencia de este evento en la hoja
-  const claveEvento = () => EVENTO.nombre + (EVENTO.fecha ? " · " + fmtFecha(EVENTO.fecha) : "");
 
-  // ---------- Modo organizador (sin evento en el enlace) ----------
-  if (!esDelEvento) {
+  // Envía datos a Apps Script. text/plain evita el preflight CORS.
+  const enviarPost = async (cuerpo) => {
+    const r = await fetch(ENDPOINT, {
+      method: "POST",
+      headers: { "Content-Type": "text/plain;charset=utf-8" },
+      body: JSON.stringify(cuerpo)
+    });
+    const res = await r.json();
+    if (!res.ok) throw new Error(res.error || "Error desconocido");
+    return res;
+  };
+
+  // ---------- Modo organizador (enlace sin código de evento) ----------
+  if (!EVENTO_ID) {
     $("titulo").textContent = "Crear lista de asistencia";
     $("creador").hidden = false;
 
     const cs = $("crear-status");
-    $("form-crear").addEventListener("submit", (e) => {
+    const btnCrear = $("btn-crear");
+    $("form-crear").addEventListener("submit", async (e) => {
       e.preventDefault();
       const nombre = $("c-nombre").value.trim();
       if (!nombre) { cs.textContent = "Escribe el nombre del evento."; cs.className = "status error"; return; }
-      const q = new URLSearchParams();
-      q.set("evento", nombre);
-      const add = (k, id) => { const v = $(id).value.trim(); if (v) q.set(k, v); };
-      add("fecha", "c-fecha"); add("hora", "c-hora"); add("duracion", "c-duracion");
-      add("facilitador", "c-facilitador"); add("objetivo", "c-objetivo");
-      const url = location.origin + location.pathname + "?" + q.toString();
-      $("link-out").value = url;
-      $("link-box").hidden = false;
-      cs.textContent = "Enlace generado. Cópialo y envíalo a los asistentes."; cs.className = "status ok";
+      btnCrear.disabled = true; cs.textContent = "Creando el evento…"; cs.className = "status";
+      try {
+        const res = await enviarPost({
+          accion: "crearEvento", nombre,
+          fecha: $("c-fecha").value.trim(), hora: $("c-hora").value.trim(),
+          duracion: $("c-duracion").value.trim(), facilitador: $("c-facilitador").value.trim(),
+          objetivo: $("c-objetivo").value.trim()
+        });
+        $("link-out").value = location.origin + location.pathname + "?e=" + res.id;
+        $("link-box").hidden = false;
+        cs.textContent = "Evento creado. Copia el enlace y envíalo a los asistentes."; cs.className = "status ok";
+      } catch (err) {
+        cs.textContent = "No se pudo crear el evento: " + err.message; cs.className = "status error";
+      } finally {
+        btnCrear.disabled = false;
+      }
     });
     $("copiar").addEventListener("click", async () => {
       const inp = $("link-out");
@@ -312,20 +323,13 @@ footer { text-align: center; color: var(--muted); font-size: 13px; padding: 28px
   }
 
   // ---------- Modo asistente ----------
-  $("titulo").textContent = EVENTO.nombre;
-  document.title = EVENTO.nombre + " · Lista de asistencia";
-  $("registro").hidden = false;
-  $("detalle").hidden = false;
-  $("e-fecha").textContent = EVENTO.fecha ? fmtFecha(EVENTO.fecha) : "—";
-  $("e-hora").textContent = EVENTO.hora || "—";
-  $("e-duracion").textContent = EVENTO.duracion || "—";
-  $("e-facilitador").textContent = EVENTO.facilitador || "—";
-  if (EVENTO.objetivo) { $("e-objetivo").textContent = EVENTO.objetivo; $("bloque-objetivo").hidden = false; }
+  $("titulo").textContent = "Cargando evento…";
 
   const form = $("form"), status = $("status"), enviar = $("enviar");
   const filas = $("filas"), total = $("total"), contador = $("contador");
   const canvas = $("firma"), ctx = canvas.getContext("2d");
   let actuales = [];
+  let cargado = false;
 
   ctx.lineWidth = 2.5; ctx.lineCap = "round"; ctx.lineJoin = "round";
   let drawing = false, last = null, hasInk = false;
@@ -345,6 +349,19 @@ footer { text-align: center; color: var(--muted); font-size: 13px; padding: 28px
   $("limpiar").addEventListener("click", clearSig);
 
   const setStatus = (t, kind) => { status.textContent = t; status.className = "status" + (kind ? " " + kind : ""); };
+
+  const mostrarEvento = (ev) => {
+    Object.assign(EVENTO, ev);
+    $("titulo").textContent = EVENTO.nombre;
+    document.title = EVENTO.nombre + " · Lista de asistencia";
+    $("e-fecha").textContent = EVENTO.fecha ? fmtFecha(EVENTO.fecha) : "—";
+    $("e-hora").textContent = EVENTO.hora || "—";
+    $("e-duracion").textContent = EVENTO.duracion || "—";
+    $("e-facilitador").textContent = EVENTO.facilitador || "—";
+    if (EVENTO.objetivo) { $("e-objetivo").textContent = EVENTO.objetivo; $("bloque-objetivo").hidden = false; }
+    $("registro").hidden = false;
+    $("detalle").hidden = false;
+  };
 
   const render = (items) => {
     actuales = items;
@@ -373,13 +390,20 @@ footer { text-align: center; color: var(--muted); font-size: 13px; padding: 28px
   render([]);
 
   const cargar = async () => {
-    if (ENDPOINT.startsWith("PEGA_AQUI")) return;
     try {
-      const r = await fetch(ENDPOINT + "?evento=" + encodeURIComponent(claveEvento()));
+      const r = await fetch(ENDPOINT + "?e=" + encodeURIComponent(EVENTO_ID));
       const data = await r.json();
+      if (!data.ok) throw new Error(data.error || "No se encontró el evento.");
+      mostrarEvento(data.evento);
       render(data.asistentes || []);
+      cargado = true;
     } catch (e) {
-      setStatus("No se pudo cargar la lista. Revisa tu conexión.", "error");
+      if (!cargado) {
+        $("titulo").textContent = "No se pudo abrir el evento";
+        contador.textContent = "Revisa que el enlace esté completo o pide uno nuevo al organizador.";
+      } else {
+        setStatus("No se pudo actualizar la lista. Revisa tu conexión.", "error");
+      }
     }
   };
 
@@ -388,23 +412,15 @@ footer { text-align: center; color: var(--muted); font-size: 13px; padding: 28px
     const nombre = $("nombre").value.trim(), documento = $("documento").value.trim();
     if (!nombre || !documento) return setStatus("Escribe tu nombre y tu cédula.", "error");
     if (!hasInk) return setStatus("Falta la firma en el recuadro.", "error");
-    if (ENDPOINT.startsWith("PEGA_AQUI")) return setStatus("El registro aún no está conectado.", "error");
     enviar.disabled = true; setStatus("Registrando…");
     try {
-      // text/plain evita el preflight CORS con Apps Script
-      const r = await fetch(ENDPOINT, {
-        method: "POST",
-        headers: { "Content-Type": "text/plain;charset=utf-8" },
-        body: JSON.stringify({
-          evento: claveEvento(), nombre, documento,
-          cargo: $("cargo").value.trim(),
-          fecha: new Date().toISOString().slice(0, 10),
-          firma: canvas.toDataURL("image/png"),
-          registrado: new Date().toISOString()
-        })
+      await enviarPost({
+        evento: EVENTO_ID, nombre, documento,
+        cargo: $("cargo").value.trim(),
+        fecha: new Date().toISOString().slice(0, 10),
+        firma: canvas.toDataURL("image/png"),
+        registrado: new Date().toISOString()
       });
-      const res = await r.json();
-      if (!res.ok) throw new Error(res.error || "Error desconocido");
       form.reset(); clearSig();
       setStatus("Asistencia registrada. Gracias.", "ok");
       cargar();
