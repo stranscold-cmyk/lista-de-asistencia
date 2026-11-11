@@ -273,6 +273,12 @@ footer { text-align: center; color: var(--muted); font-size: 13px; padding: 28px
     return m ? m[3] + "/" + m[2] + "/" + m[1] : v;
   };
 
+  // Las firmas están en Drive; esta dirección permite mostrarlas dentro de la página.
+  const imagenFirma = (url) => {
+    const m = /[?&]id=([\w-]+)/.exec(url || "");
+    return m ? "https://drive.google.com/thumbnail?id=" + m[1] + "&sz=w600" : url;
+  };
+
   // Envía datos a Apps Script. text/plain evita el preflight CORS.
   const enviarPost = async (cuerpo) => {
     const r = await fetch(ENDPOINT, {
@@ -377,7 +383,8 @@ footer { text-align: center; color: var(--muted); font-size: 13px; padding: 28px
       const fir = document.createElement("td"); fir.className = "firma";
       if (it && it.firmaUrl) {
         const img = document.createElement("img");
-        img.src = it.firmaUrl; img.alt = "Firma de " + (it.nombre || "asistente"); img.loading = "lazy";
+        img.referrerPolicy = "no-referrer";
+        img.src = imagenFirma(it.firmaUrl); img.alt = "Firma de " + (it.nombre || "asistente"); img.loading = "lazy";
         fir.append(img);
       }
       tr.append(n, nom, ced, car, fir);
